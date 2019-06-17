@@ -31,19 +31,28 @@ import java.nio.channels.FileChannel;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+
+import org.opencv.android.LoaderCallbackInterface;
 import org.tensorflow.lite.Interpreter;
+import java.util.Map;
+import org.opencv.core.CvType;
+import org.opencv.core.Mat;
+import org.opencv.core.Size;
+import org.opencv.imgproc.Imgproc;
+import org.tensorflow.lite.Tensor;
 
 /** Classifies images with Tensorflow Lite. */
-public class ImageClassifier {
+public class ImageClassifier{
 
   /** Tag for the {@link Log}. */
   private static final String TAG = "TfLiteCameraDemo";
 
   /** Name of the model file stored in Assets. */
-  private static final String MODEL_PATH = "graph.lite";
+  private static final String MODEL_PATH = "model-124500.lite";
 
   /** Name of the label file stored in Assets. */
   private static final String LABEL_PATH = "labels.txt";
@@ -52,12 +61,15 @@ public class ImageClassifier {
   private static final int RESULTS_TO_SHOW = 3;
 
   /** Dimensions of inputs. */
-  private static final int DIM_BATCH_SIZE = 1;
+  private static final int DIM_BATCH_SIZE = 2;
 
   private static final int DIM_PIXEL_SIZE = 3;
 
-  static final int DIM_IMG_SIZE_X = 224;
-  static final int DIM_IMG_SIZE_Y = 224;
+  static final int DIM_IMG_SIZE_X = 32;
+  static final int DIM_IMG_SIZE_Y = 32;
+
+  private static int out_width = 192;
+  private static int out_height = 192;
 
   private static final int IMAGE_MEAN = 128;
   private static final float IMAGE_STD = 128.0f;
@@ -75,12 +87,25 @@ public class ImageClassifier {
   /** A ByteBuffer to hold image data, to be feed into Tensorflow Lite as inputs. */
   private ByteBuffer imgData = null;
 
+  public float pre_r = 0;
+  public float pre_x = 0;
+  public float pre_y = 0;
+  public float pre_z = 0;
+
+
   /** An array to hold inference results, to be feed into Tensorflow Lite as outputs. */
   private float[][] labelProbArray = null;
   /** multi-stage low pass filter **/
   private float[][] filterLabelProbArray = null;
+  private float[][][][] hotmaplabelProbArray = null;
+  public float[][] mPrintPointArray = null;
+  private Mat mMat =  null;//new Mat(out_width, out_height, CvType.CV_32F);;
   private static final int FILTER_STAGES = 3;
   private static final float FILTER_FACTOR = 0.4f;
+
+  /*为区块追踪准备*/
+  public boolean is_first = true;
+
 
   private PriorityQueue<Map.Entry<String, Float>> sortedLabels =
       new PriorityQueue<>(
@@ -91,7 +116,24 @@ public class ImageClassifier {
               return (o1.getValue()).compareTo(o2.getValue());
             }
           });
-
+    public Map<Integer, Object> allocateOutputBuffers(int[] shapes){
+        int o_size = shapes.length;
+        Map<Integer, Object> outputs = new HashMap<>();
+        for (int i=0; i < o_size; i++) {
+            ByteBuffer o_bytes = ByteBuffer.allocate(shapes[i]);
+            outputs.put(i, o_bytes);
+        }
+        return outputs;
+    }
+    private Object[] allocateInputBuffers(int[] shapes){
+        int i_size = shapes.length;
+        Object inputs[] = new Object[i_size];
+        for (int i=0; i < i_size; i++) {
+            ByteBuffer i_bytes = ByteBuffer.allocate(shapes[i]);
+            inputs[i] = i_bytes;
+        }
+        return inputs;
+    }
   /** Initializes an {@code ImageClassifier}. */
   ImageClassifier(Activity activity) throws IOException {
     tflite = new Interpreter(loadModelFile(activity));
@@ -100,55 +142,29 @@ public class ImageClassifier {
         ByteBuffer.allocateDirect(
             4 * DIM_BATCH_SIZE * DIM_IMG_SIZE_X * DIM_IMG_SIZE_Y * DIM_PIXEL_SIZE);
     imgData.order(ByteOrder.nativeOrder());
-    labelProbArray = new float[1][labelList.size()];
+
+    labelProbArray = new float[1][4];
+    hotmaplabelProbArray = new float[1][out_width][out_height][21];
     filterLabelProbArray = new float[FILTER_STAGES][labelList.size()];
     Log.d(TAG, "Created a Tensorflow Lite Image Classifier.");
   }
 
   /** Classifies a frame from the preview stream. */
   String classifyFrame(Bitmap bitmap) {
+    Log.d("chen debug", "into classifyFrame: " );
     if (tflite == null) {
       Log.e(TAG, "Image classifier has not been initialized; Skipped.");
-      return "Uninitialized Classifier.";
+      return "Image classifier has not been initialized; Skipped.";
     }
     convertBitmapToByteBuffer(bitmap);
     // Here's where the magic happens!!!
     long startTime = SystemClock.uptimeMillis();
-    tflite.run(imgData, labelProbArray);
+    runInference();
     long endTime = SystemClock.uptimeMillis();
     Log.d(TAG, "Timecost to run model inference: " + Long.toString(endTime - startTime));
-
-    // smooth the results
-    applyFilter();
-
-    // print the results
-    String textToShow = printTopKLabels();
-    textToShow = Long.toString(endTime - startTime) + "ms" + textToShow;
-    return textToShow;
-  }
-
-  void applyFilter(){
-    int num_labels =  labelList.size();
-
-    // Low pass filter `labelProbArray` into the first stage of the filter.
-    for(int j=0; j<num_labels; ++j){
-      filterLabelProbArray[0][j] += FILTER_FACTOR*(labelProbArray[0][j] -
-                                                   filterLabelProbArray[0][j]);
-    }
-    // Low pass filter each stage into the next.
-    for (int i=1; i<FILTER_STAGES; ++i){
-      for(int j=0; j<num_labels; ++j){
-        filterLabelProbArray[i][j] += FILTER_FACTOR*(
-                filterLabelProbArray[i-1][j] -
-                filterLabelProbArray[i][j]);
-
-      }
-    }
-
-    // Copy the last stage filter output back to `labelProbArray`.
-    for(int j=0; j<num_labels; ++j){
-      labelProbArray[0][j] = filterLabelProbArray[FILTER_STAGES-1][j];
-    }
+    //String textToShow = Long.toString(endTime - startTime) + "ms" ;
+     String textToShow ="pre_r:"+Float.toString(pre_r)+"\npre_x:"+Float.toString(pre_x)+"\npre_y:"+Float.toString(pre_y)+"\npre_z:"+Float.toString(pre_z);
+     return textToShow;//textToShow;
   }
 
   /** Closes tflite to release resources. */
@@ -182,41 +198,167 @@ public class ImageClassifier {
 
   /** Writes Image data into a {@code ByteBuffer}. */
   private void convertBitmapToByteBuffer(Bitmap bitmap) {
+    long startTime = SystemClock.uptimeMillis();
+    bitmap.getPixels(intValues, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
     if (imgData == null) {
       return;
     }
-    imgData.rewind();
-    bitmap.getPixels(intValues, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
-    // Convert the image to floating point.
-    int pixel = 0;
-    long startTime = SystemClock.uptimeMillis();
-    for (int i = 0; i < DIM_IMG_SIZE_X; ++i) {
-      for (int j = 0; j < DIM_IMG_SIZE_Y; ++j) {
-        final int val = intValues[pixel++];
-        imgData.putFloat((((val >> 16) & 0xFF)-IMAGE_MEAN)/IMAGE_STD);
-        imgData.putFloat((((val >> 8) & 0xFF)-IMAGE_MEAN)/IMAGE_STD);
-        imgData.putFloat((((val) & 0xFF)-IMAGE_MEAN)/IMAGE_STD);
-      }
+    //如果是第一次就用两个相同bitmap代替
+      // 否则就把前一半挪到后面，然后用新输入的图片填充前面的
+    if (is_first){
+        is_first = false;
+        int pixel = 0;
+        for (int i = 0; i < DIM_IMG_SIZE_X; ++i) {
+            for (int j = 0; j < DIM_IMG_SIZE_Y; ++j) {
+                final int val = intValues[pixel++];
+                float r = ((val >> 16) & 0xFF),g = ((val >> 8) & 0xFF),b = ((val) & 0xFF);
+                r = r/255-(float)0.5;
+                g = g/255-(float)0.5;
+                b = b/255-(float)0.5;
+                imgData.putFloat(r);
+                imgData.putFloat(g);
+                imgData.putFloat(b);
+            }
+        }
+        pixel = 0;
+        for (int i = 0; i < DIM_IMG_SIZE_X; ++i) {
+            for (int j = 0; j < DIM_IMG_SIZE_Y; ++j) {
+                final int val = intValues[pixel++];
+                float r = ((val >> 16) & 0xFF),g = ((val >> 8) & 0xFF),b = ((val) & 0xFF);
+                r = r/255-(float)0.5;
+                g = g/255-(float)0.5;
+                b = b/255-(float)0.5;
+                imgData.putFloat(r);
+                imgData.putFloat(g);
+                imgData.putFloat(b);
+            }
+        }
+
+    }else{
+        //imgData.rewind();
+        int pixel = 0;
+        for (int i = 0; i < DIM_IMG_SIZE_X; ++i) {
+            for (int j = 0; j < DIM_IMG_SIZE_Y; ++j) {
+                float r =imgData.getFloat((pixel*3+0+DIM_IMG_SIZE_X*DIM_IMG_SIZE_Y*3)*4);
+                imgData.putFloat((pixel*3+0)*4,r);
+                float g =  imgData.getFloat((pixel*3+1+DIM_IMG_SIZE_X*DIM_IMG_SIZE_Y*3)*4);
+                imgData.putFloat((pixel*3+1)*4,g);
+                float b = imgData.getFloat((pixel*3+2+DIM_IMG_SIZE_X*DIM_IMG_SIZE_Y*3)*4);
+                imgData.putFloat((pixel*3+2)*4,b);
+                pixel++;
+            }
+        }
+
+        pixel = 0;
+        for (int i = 0; i < DIM_IMG_SIZE_X; ++i) {
+            for (int j = 0; j < DIM_IMG_SIZE_Y; ++j) {
+                final int val = intValues[pixel];
+                float r = ((val >> 16) & 0xFF),g = ((val >> 8) & 0xFF),b = ((val) & 0xFF);
+                r = r/255-(float)0.5;
+                g = g/255-(float)0.5;
+                b = b/255-(float)0.5;
+                imgData.putFloat((pixel*3+0+DIM_IMG_SIZE_X*DIM_IMG_SIZE_Y*3)*4,r);
+                imgData.putFloat((pixel*3+1+DIM_IMG_SIZE_X*DIM_IMG_SIZE_Y*3)*4,g);
+                imgData.putFloat((pixel*3+2+DIM_IMG_SIZE_X*DIM_IMG_SIZE_Y*3)*4,b);
+                pixel++;
+            }
+        }
+
+        //将buffer转换成bitmap
+        int[] color1 = new int[32*32];
+        pixel = 0;
+        for (int i = 0; i < DIM_IMG_SIZE_X; ++i) {
+            for (int j = 0; j < DIM_IMG_SIZE_Y; ++j) {
+                float r =imgData.getFloat((pixel*3+0)*4);
+                r = (r+0.5f)*255;
+                float g =  imgData.getFloat((pixel*3+1)*4);
+                g = (g+0.5f)*255;
+                float b = imgData.getFloat((pixel*3+2)*4);
+                b = (b+0.5f)*255;
+                color1[pixel] = ((int)r << 16) | ((int)g << 8) | (int)b | 0xFF000000;
+                pixel++;
+
+
+            }
+        }
+        Bitmap bmp1 = Bitmap.createBitmap(color1, 0, 32, 32, 32,
+                Bitmap.Config.ARGB_8888);
+
+        int[] color2 = new int[32*32];
+        pixel = 0;
+        for (int i = 0; i < DIM_IMG_SIZE_X; ++i) {
+            for (int j = 0; j < DIM_IMG_SIZE_Y; ++j) {
+                float r =imgData.getFloat((pixel*3+0+DIM_IMG_SIZE_X*DIM_IMG_SIZE_Y*3)*4);
+                r = (r+0.5f)*255;
+                float g =  imgData.getFloat((pixel*3+1+DIM_IMG_SIZE_X*DIM_IMG_SIZE_Y*3)*4);
+                g = (g+0.5f)*255;
+                float b = imgData.getFloat((pixel*3+2+DIM_IMG_SIZE_X*DIM_IMG_SIZE_Y*3)*4);
+                b = (b+0.5f)*255;
+                color2[pixel] = ((int)r << 16) | ((int)g << 8) | (int)b | 0xFF000000;
+                pixel++;
+
+
+            }
+        }
+        Bitmap bmp2 = Bitmap.createBitmap(color2, 0, 32, 32, 32,
+                Bitmap.Config.ARGB_8888);
+
+        pixel = 0;
+        //imageView.setImageBitmap(stitchBmp);
+        //imgData.flip();
+//        pixel = 0;
+//        int[][][][] image_read = new int[2][32][32][3];
+//        for(int image_id = 0;image_id<2;image_id++) {
+//            for (int i = 0; i < DIM_IMG_SIZE_X; ++i) {
+//                for (int j = 0; j < DIM_IMG_SIZE_Y; ++j){
+//                    for (int pix = 0; pix < 3; ++pix){
+//                        float tmp = imgData.getFloat((pixel)*4);
+//                        tmp = (tmp+0.5f)*255;
+//                        int tmpi = (int)tmp;
+//                        image_read[image_id][i][j][pix] = tmpi;
+//                        pixel++;
+//                    }
+//                }
+//            }
+//        }
     }
+
+
+
+    //
+
+    // Convert the image to floating point.
+
     long endTime = SystemClock.uptimeMillis();
     Log.d(TAG, "Timecost to put values into ByteBuffer: " + Long.toString(endTime - startTime));
   }
 
-  /** Prints top-K labels, to be shown in UI as the results. */
-  private String printTopKLabels() {
-    for (int i = 0; i < labelList.size(); ++i) {
-      sortedLabels.add(
-          new AbstractMap.SimpleEntry<>(labelList.get(i), labelProbArray[0][i]));
-      if (sortedLabels.size() > RESULTS_TO_SHOW) {
-        sortedLabels.poll();
-      }
+  private void runInference(){
+    labelProbArray = new float[1][4];
+    tflite.run(imgData, labelProbArray);
+    if (labelProbArray == null){
+        Log.d("chen debug info", "labelProbArray == null");
+        return;
     }
-    String textToShow = "";
-    final int size = sortedLabels.size();
-    for (int i = 0; i < size; ++i) {
-      Map.Entry<String, Float> label = sortedLabels.poll();
-      textToShow = String.format("\n%s: %4.2f",label.getKey(),label.getValue()) + textToShow;
+    if (!CameraActivity.Object.isOpenCVInit){
+        Log.d("chen debug info", "!CameraActivity.Object.isOpenCVInit");
+        return;
     }
-    return textToShow;
+    pre_r = labelProbArray[0][0];
+    pre_x = labelProbArray[0][1];
+    pre_y = labelProbArray[0][2];
+    pre_z = labelProbArray[0][3];
+
+    pre_r = (float)(Math.round(pre_r*1000))/1000;
+    pre_x = (float)(Math.round(pre_x*1000))/1000;
+    pre_y = (float)(Math.round(pre_y*1000))/1000;
+    pre_z = (float)(Math.round(pre_z*1000))/1000;
+
+  }
+  private float get( int x, int y, float[] arr){
+    if (x < 0 || y < 0 || x >= out_width || y >= out_height)
+      return -1;
+    else
+      return arr[x * out_width + y];
   }
 }

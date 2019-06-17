@@ -13,30 +13,30 @@
  * limitations under the License.
  */
 
+
 package com.example.android.tflitecamerademo;
 
 import android.content.Context;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.util.AttributeSet;
-import android.view.TextureView;
+import android.widget.FrameLayout;
 
-/**
- * A {@link TextureView} that can be adjusted to a specified aspect ratio.
- */
-public class AutoFitTextureView extends TextureView {
+public class AutoFitFrameLayout extends FrameLayout {
 
     private int mRatioWidth = 0;
     private int mRatioHeight = 0;
 
-    public AutoFitTextureView(Context context) {
-        this(context, null);
+    public AutoFitFrameLayout(@NonNull Context context) {
+        super(context);
     }
 
-    public AutoFitTextureView(Context context, AttributeSet attrs) {
-        this(context, attrs, 0);
+    public AutoFitFrameLayout(@NonNull Context context, @Nullable AttributeSet attrs) {
+        super(context, attrs);
     }
 
-    public AutoFitTextureView(Context context, AttributeSet attrs, int defStyle) {
-        super(context, attrs, defStyle);
+    public AutoFitFrameLayout(@NonNull Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
+        super(context, attrs, defStyleAttr);
     }
 
     /**

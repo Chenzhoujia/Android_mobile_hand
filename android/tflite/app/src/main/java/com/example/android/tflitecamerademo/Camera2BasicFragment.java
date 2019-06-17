@@ -26,6 +26,8 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.graphics.ImageFormat;
 import android.graphics.Matrix;
 import android.graphics.Point;
@@ -54,14 +56,18 @@ import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import java.io.IOException;
+import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
@@ -78,10 +84,13 @@ public class Camera2BasicFragment extends Fragment
 
   private static final int PERMISSIONS_REQUEST_CODE = 1;
 
+  private static int imageSizeX = 192;
+  private static int imageSizeY = 192;
   private final Object lock = new Object();
   private boolean runClassifier = false;
   private boolean checkedPermissions = false;
   private TextView textView;
+  //private ImageView iv;
   private ImageClassifier classifier;
 
   /** Max preview width that is guaranteed by Camera2 API */
@@ -121,6 +130,11 @@ public class Camera2BasicFragment extends Fragment
 
   /** An {@link AutoFitTextureView} for camera preview. */
   private AutoFitTextureView textureView;
+
+  private AutoFitFrameLayout layoutFrame;
+  private DrawView drawView;
+  private LinearLayout layoutBottom;
+
 
   /** A {@link CameraCaptureSession } for camera preview. */
   private CameraCaptureSession captureSession;
@@ -201,20 +215,21 @@ public class Camera2BasicFragment extends Fragment
    * Shows a {@link Toast} on the UI thread for the classification results.
    *
    * @param text The message to show
+   *
    */
   private void showToast(final String text) {
     final Activity activity = getActivity();
     if (activity != null) {
       activity.runOnUiThread(
-          new Runnable() {
-            @Override
-            public void run() {
-              textView.setText(text);
-            }
-          });
+              new Runnable() {
+                @Override
+                public void run() {
+                  textView.setText(text);
+                  drawView.invalidate();
+                }
+              });
     }
   }
-
   /**
    * Resizes image.
    *
@@ -289,6 +304,10 @@ public class Camera2BasicFragment extends Fragment
   public void onViewCreated(final View view, Bundle savedInstanceState) {
     textureView = (AutoFitTextureView) view.findViewById(R.id.texture);
     textView = (TextView) view.findViewById(R.id.text);
+    layoutFrame = (AutoFitFrameLayout)view.findViewById(R.id.layout_frame);
+    drawView = (DrawView)view.findViewById(R.id.drawview);
+    //layoutBottom = (LinearLayout)view.findViewById(R.id.layout_bottom);
+    //iv = (ImageView) view.findViewById(R.id.iv_signature_new);
   }
 
   /** Load the model and labels. */
@@ -297,6 +316,9 @@ public class Camera2BasicFragment extends Fragment
     super.onActivityCreated(savedInstanceState);
     try {
       classifier = new ImageClassifier(getActivity());
+
+      if (drawView != null)
+        drawView.setImgSize(imageSizeX, imageSizeY);
     } catch (IOException e) {
       Log.e(TAG, "Failed to initialize an image classifier.");
     }
@@ -424,8 +446,13 @@ public class Camera2BasicFragment extends Fragment
         int orientation = getResources().getConfiguration().orientation;
         if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
           textureView.setAspectRatio(previewSize.getWidth(), previewSize.getHeight());
+          layoutFrame .setAspectRatio(previewSize.getWidth(), previewSize.getHeight());
+          drawView.setAspectRatio(previewSize.getWidth(), previewSize.getHeight());
         } else {
           textureView.setAspectRatio(previewSize.getHeight(), previewSize.getWidth());
+          layoutFrame .setAspectRatio(previewSize.getHeight(), previewSize.getWidth());
+          drawView.setAspectRatio(previewSize.getHeight(), previewSize.getWidth());
+
         }
 
         this.cameraId = cameraId;
@@ -658,11 +685,15 @@ public class Camera2BasicFragment extends Fragment
       showToast("Uninitialized Classifier or invalid context.");
       return;
     }
-    Bitmap bitmap =
-        textureView.getBitmap(ImageClassifier.DIM_IMG_SIZE_X, ImageClassifier.DIM_IMG_SIZE_Y);
-    String textToShow = classifier.classifyFrame(bitmap);
+    //对图像进行剪切
+    Bitmap bitmap = textureView.getBitmap(320, 320);
+    bitmap = Bitmap.createBitmap(bitmap, 160-16,160-16, ImageClassifier.DIM_IMG_SIZE_X, ImageClassifier.DIM_IMG_SIZE_Y);
+
+    String time = classifier.classifyFrame(bitmap);
     bitmap.recycle();
-    showToast(textToShow);
+
+    //drawView.setDrawPoint(classifier.mPrintPointArray, 0.5f);
+    showToast(time);
   }
 
   /** Compares two {@code Size}s based on their areas. */

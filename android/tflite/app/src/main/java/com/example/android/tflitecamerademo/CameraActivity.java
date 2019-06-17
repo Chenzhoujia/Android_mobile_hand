@@ -16,13 +16,65 @@ limitations under the License.
 package com.example.android.tflitecamerademo;
 
 import android.app.Activity;
+import android.graphics.Point;
 import android.os.Bundle;
+import android.util.Log;
+import android.view.Display;
+import android.view.WindowManager;
+
+import org.opencv.android.BaseLoaderCallback;
+import org.opencv.android.LoaderCallbackInterface;
+import org.opencv.android.OpenCVLoader;
 
 /** Main {@code Activity} class for the Camera app. */
 public class CameraActivity extends Activity {
 
+  private static final String TAG = "TfLiteCameraDemo";
+  public BaseLoaderCallback mOpenCVCallBack = new BaseLoaderCallback(this) {
+    @Override
+    public void onManagerConnected(int status) {
+      switch (status) {
+        case LoaderCallbackInterface.SUCCESS:
+        {
+          Log.i("chen debug info", "OpenCV loaded successfully");
+          // Create and set View
+          CameraActivity.Object.isOpenCVInit = true;
+        } break;
+        case LoaderCallbackInterface.INCOMPATIBLE_MANAGER_VERSION:
+        { } break;
+        case LoaderCallbackInterface.INIT_FAILED:
+        {Log.i("chen debug info", "OpenCV loaded INIT_FAILED"); } break;
+        case LoaderCallbackInterface.INSTALL_CANCELED:
+        { } break;
+        case LoaderCallbackInterface.MARKET_ERROR:
+        { } break;
+        default:
+        {
+          super.onManagerConnected(status);
+        } break;
+      }
+    }
+  };
+  /** Call on every application resume **/
+  @Override
+  protected void onResume()
+  {
+    Log.i(TAG, "Called onResume");
+    super.onResume();
+    if (!OpenCVLoader.initDebug()) {
+      OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION, this, mOpenCVCallBack);
+    } else {
+      mOpenCVCallBack.onManagerConnected(LoaderCallbackInterface.SUCCESS);
+    }
+  }
   @Override
   protected void onCreate(Bundle savedInstanceState) {
+    Display display = getWindowManager().getDefaultDisplay();
+    Point outSize = new Point();
+    display.getSize(outSize);//不能省略,必须有
+    int screenWidth = outSize.x;//得到屏幕的宽度
+    int screenHeight = outSize.y;//得到屏幕的高度
+
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_camera);
     if (null == savedInstanceState) {
@@ -31,5 +83,14 @@ public class CameraActivity extends Activity {
           .replace(R.id.container, Camera2BasicFragment.newInstance())
           .commit();
     }
+  }
+
+  static class Object{
+    public Object(){
+        //        System.loadLibrary("opencv_java");
+        System.loadLibrary("opencv_java3");
+    }
+
+    static Boolean isOpenCVInit = false;
   }
 }
