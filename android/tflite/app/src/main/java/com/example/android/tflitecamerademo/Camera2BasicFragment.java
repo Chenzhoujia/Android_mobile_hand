@@ -692,7 +692,7 @@ public class Camera2BasicFragment extends Fragment
     String time = classifier.classifyFrame(bitmap);
     bitmap.recycle();
 
-    //drawView.setDrawPoint(classifier.mPrintPointArray, 0.5f);
+    drawView.setDrawPoint(classifier.mPrintPointArray, 0.5f);
     showToast(time);
   }
 

@@ -93,7 +93,7 @@ public class DrawView extends View {
         mDrawPoint.clear();
 
         float tempX, tempY;
-        for (int i = 0; i < 21; i++) {
+        for (int i = 0; i < 4; i++) {
             tempX = point[0][i] / mRatioX;
             tempY = point[1][i] / mRatioY;
             mDrawPoint.add(new PointF(tempX, tempY));
@@ -149,54 +149,13 @@ public class DrawView extends View {
         PointF p1 = mDrawPoint.get(1);
         PointF p2 = mDrawPoint.get(2);
         PointF p3 = mDrawPoint.get(3);
-        PointF p4 = mDrawPoint.get(4);
-        PointF p5 = mDrawPoint.get(5);
-        PointF p6 = mDrawPoint.get(6);
-        PointF p7 = mDrawPoint.get(7);
-        PointF p8 = mDrawPoint.get(8);
-        PointF p9 = mDrawPoint.get(9);
-        PointF p10 = mDrawPoint.get(10);
-        PointF p11 = mDrawPoint.get(11);
-        PointF p12 = mDrawPoint.get(12);
-        PointF p13 = mDrawPoint.get(13);
-        PointF p14 = mDrawPoint.get(14);
-        PointF p15 = mDrawPoint.get(15);
-        PointF p16 = mDrawPoint.get(16);
-        PointF p17 = mDrawPoint.get(17);
-        PointF p18 = mDrawPoint.get(18);
-        PointF p19 = mDrawPoint.get(19);
-        PointF p20 = mDrawPoint.get(20);
 
         //0-1 5 9 13 17
-        canvas.drawLine(p0.x, p0.y, p4.x, p4.y, mPaint);
-        canvas.drawLine(p0.x, p0.y, p8.x, p8.y, mPaint);
-        canvas.drawLine(p0.x, p0.y, p12.x, p12.y, mPaint);
-        canvas.drawLine(p0.x, p0.y, p16.x, p16.y, mPaint);
-        canvas.drawLine(p0.x, p0.y, p20.x, p20.y, mPaint);
-        // 1234
+        canvas.drawLine(p0.x, p0.y, p1.x, p1.y, mPaint);
         canvas.drawLine(p1.x, p1.y, p2.x, p2.y, mPaint);
         canvas.drawLine(p2.x, p2.y, p3.x, p3.y, mPaint);
-        canvas.drawLine(p3.x, p3.y, p4.x, p4.y, mPaint);
+        canvas.drawLine(p3.x, p3.y, p0.x, p0.y, mPaint);
 
-        // 5678
-        canvas.drawLine(p5.x, p5.y, p6.x, p6.y, mPaint);
-        canvas.drawLine(p6.x, p6.y, p7.x, p7.y, mPaint);
-        canvas.drawLine(p7.x, p7.y, p8.x, p8.y, mPaint);
-
-        // 9 10 11 12
-        canvas.drawLine(p9.x, p9.y, p10.x, p10.y, mPaint);
-        canvas.drawLine(p10.x, p10.y, p11.x, p11.y, mPaint);
-        canvas.drawLine(p11.x, p11.y, p12.x, p12.y, mPaint);
-
-        // 13 14 15 16
-        canvas.drawLine(p13.x, p13.y, p14.x, p14.y, mPaint);
-        canvas.drawLine(p14.x, p14.y, p15.x, p15.y, mPaint);
-        canvas.drawLine(p15.x, p15.y, p16.x, p16.y, mPaint);
-
-        // 17 18 19 29
-        canvas.drawLine(p17.x, p17.y, p18.x, p18.y, mPaint);
-        canvas.drawLine(p18.x, p18.y, p19.x, p19.y, mPaint);
-        canvas.drawLine(p19.x, p19.y, p20.x, p20.y, mPaint);
 
 
 
