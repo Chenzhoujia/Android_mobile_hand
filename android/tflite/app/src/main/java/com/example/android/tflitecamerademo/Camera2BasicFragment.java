@@ -575,7 +575,7 @@ public class Camera2BasicFragment extends Fragment
     }
   }
 
-  /** Takes photos and classify them periodically. */
+  /** 将耗时的深度学习计算作为工作线程backgroundThread，通过backgroundHandler通知主线程，更新UI*/
   private Runnable periodicClassify =
       new Runnable() {
         @Override
@@ -687,7 +687,8 @@ public class Camera2BasicFragment extends Fragment
     }
     //对图像进行剪切
     Bitmap bitmap = textureView.getBitmap(320, 320);
-    bitmap = Bitmap.createBitmap(bitmap, 160-16,160-16, ImageClassifier.DIM_IMG_SIZE_X, ImageClassifier.DIM_IMG_SIZE_Y);
+    //根据坐标剪切图像
+    bitmap = Bitmap.createBitmap(bitmap, classifier.centerx-16,classifier.centery-16, ImageClassifier.DIM_IMG_SIZE_X, ImageClassifier.DIM_IMG_SIZE_Y);
 
     String time = classifier.classifyFrame(bitmap);
     bitmap.recycle();

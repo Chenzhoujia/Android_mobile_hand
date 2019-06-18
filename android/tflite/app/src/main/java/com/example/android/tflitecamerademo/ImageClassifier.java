@@ -52,7 +52,7 @@ public class ImageClassifier{
   private static final String TAG = "TfLiteCameraDemo";
 
   /** Name of the model file stored in Assets. */
-  private static final String MODEL_PATH = "model-2700.lite";
+  private static final String MODEL_PATH = "model-4200.lite";
 
   /** Name of the label file stored in Assets. */
   private static final String LABEL_PATH = "labels.txt";
@@ -91,6 +91,8 @@ public class ImageClassifier{
   public float pre_x = 0;
   public float pre_y = 0;
   public float pre_z = 0;
+  public int centerx = 50;
+  public int centery = 100;
 
 
   /** An array to hold inference results, to be feed into Tensorflow Lite as outputs. */
@@ -195,13 +197,12 @@ public class ImageClassifier{
   /** Writes Image data into a {@code ByteBuffer}. */
   private void convertBitmapToByteBuffer(Bitmap bitmap) {
     long startTime = SystemClock.uptimeMillis();
-    bitmap.getPixels(intValues, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
+
     if (imgData == null) {
       return;
     }
-    //如果是第一次就用两个相同bitmap代替
-      // 否则就把前一半挪到后面，然后用新输入的图片填充前面的
-    imgData.clear();
+    imgData.rewind();
+    bitmap.getPixels(intValues, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
     int pixel = 0;
     for (int i = 0; i < DIM_IMG_SIZE_X; ++i) {
         for (int j = 0; j < DIM_IMG_SIZE_Y; ++j) {
@@ -225,7 +226,6 @@ public class ImageClassifier{
   }
 
   private void runInference(){
-    labelProbArray = new float[1][32][32][2];
     tflite.run(imgData, labelProbArray);
     if (labelProbArray == null){
         Log.d("chen debug info", "labelProbArray == null");
@@ -235,28 +235,45 @@ public class ImageClassifier{
         Log.d("chen debug info", "!CameraActivity.Object.isOpenCVInit");
         return;
     }
-    pre_r = labelProbArray[0][0][0][0];
-    pre_x = labelProbArray[0][1][0][0];
-    pre_y = labelProbArray[0][2][0][0];
-    pre_z = labelProbArray[0][3][0][0];
-
-    pre_r = (float)(Math.round(pre_r*1000))/1000;
-    pre_x = (float)(Math.round(pre_x*1000))/1000;
-    pre_y = (float)(Math.round(pre_y*1000))/1000;
-    pre_z = (float)(Math.round(pre_z*1000))/1000;
-
-    float centerx = 50;
-    float centery = 50;
-
+    float max_x = 0;
+    float max_y = 0;
+    float sum_1 = 0;
+    float sum_2 = 0;
+    float max_value = labelProbArray[0][0][0][0]-labelProbArray[0][0][0][1];
+    for(int hang = 0;hang<32;hang++){
+        for(int lie = 0;lie<32;lie++){
+            sum_1+=labelProbArray[0][hang][lie][0];
+            sum_2+=labelProbArray[0][hang][lie][1];
+            float labelProbArray_tmp = labelProbArray[0][hang][lie][0]-labelProbArray[0][hang][lie][1];
+            if(max_value<labelProbArray_tmp){
+                max_value = labelProbArray_tmp;
+                max_x = hang;
+                max_y = lie;
+            }
+        }
+    }
+    Log.d("chen debug info", "sum_1: "+Float.toString(sum_1)+"sum_2: "+Float.toString(sum_2));
+    int right_move = (int)(max_x - 15.5);
+    int down_move = (int)(max_y - 15.5);
+    centery = centery+down_move;
+    centerx = centerx+right_move;
+    if(centery<16|centery>320-16){
+        centery = 160;
+    }
+    if(centerx<16|centerx>320-16){
+        centerx = 160;
+    }
+    max_value = 0.0f;
+    //根据原始的坐标截图，根据改变后的坐标移动
     mPrintPointArray = new float[2][4];
-    mPrintPointArray[0][0] = centerx-12;
-    mPrintPointArray[1][0] = centery-12;
-    mPrintPointArray[0][1] = centerx-12;
-    mPrintPointArray[1][1] = centery+12;
-    mPrintPointArray[0][2] = centerx+12;
-    mPrintPointArray[1][2] = centery-12;
-    mPrintPointArray[0][3] = centerx+12;
-    mPrintPointArray[1][3] = centery+12;
+    mPrintPointArray[0][0] = centerx-16;
+    mPrintPointArray[1][0] = centery-16;
+    mPrintPointArray[0][1] = centerx-16;
+    mPrintPointArray[1][1] = centery+16;
+    mPrintPointArray[0][2] = centerx+16;
+    mPrintPointArray[1][2] = centery+16;
+    mPrintPointArray[0][3] = centerx+16;
+    mPrintPointArray[1][3] = centery-16;
 
   }
   private float get( int x, int y, float[] arr){

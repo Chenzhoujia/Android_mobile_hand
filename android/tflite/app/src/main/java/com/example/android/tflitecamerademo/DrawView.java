@@ -183,5 +183,7 @@ public class DrawView extends View {
 
         mRatioX = ((float) mImgWidth) / mWidth;
         mRatioY = ((float) mImgHeight) / mHeight;
+        mRatioX = ((float) 320) / 1785;
+        mRatioY = ((float) 320) / 1785;
     }
 }

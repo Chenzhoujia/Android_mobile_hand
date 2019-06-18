@@ -27,8 +27,8 @@
 
         <com.example.android.tflitecamerademo.AutoFitTextureView
             android:id="@+id/texture"
-            android:layout_width="500dp"
-            android:layout_height="500dp" />
+            android:layout_width="510dp"
+            android:layout_height="510dp" />
 
         <com.example.android.tflitecamerademo.DrawView
             android:id="@+id/drawview"
